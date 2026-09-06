@@ -1,0 +1,12 @@
+# 브라우저 프로필(로그인 세션·쿠키가 들어 있으므로 절대 커밋하지 않습니다)
+.profile/
+*.profile/
+
+# probe 결과
+candidates.json
+
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/

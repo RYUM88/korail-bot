@@ -1,0 +1,13 @@
+{
+  "url": "https://bt.korail.com/holiday/main#none",
+  "selector": null,
+  "profile": ".profile",
+  "lead": "0ms",
+  "reload_lead": "3s",
+  "reload_after": 1.0,
+  "retry_window": 20.0,
+  "click_mode": "auto",
+  "min_score": 60.0,
+  "login_pause": true,
+  "settle": 1.5
+}
