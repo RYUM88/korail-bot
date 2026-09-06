@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from conftest import browser_executable  # noqa: E402
 from fake_korail import FakeKorail  # noqa: E402
 from korail_bot.cli import main  # noqa: E402
-from korail_bot.clicker import TicketPage  # noqa: E402
+from korail_bot.clicker import TicketPage, wait_until_closed  # noqa: E402
 from korail_bot.scheduler import KST  # noqa: E402
 
 playwright_api = pytest.importorskip("playwright.sync_api")
@@ -176,3 +176,21 @@ def test_clock_command_reports_offset(capsys):
     output = capsys.readouterr().out
     assert "코레일 서버 시각" in output
     assert "-21" in output or "-20" in output
+
+
+def test_wait_until_closed_returns_when_window_is_closed(browser):
+    """Enter 입력 대신, 사용자가 창을 닫는 것으로 끝난다."""
+    context, page = browser
+    page.close()  # 사용자가 마지막 창을 닫은 상황
+    assert wait_until_closed(context, timeout=5.0, poll=0.1) is True
+
+
+def test_wait_until_closed_gives_up_after_timeout(browser):
+    context, _page = browser
+    assert wait_until_closed(context, timeout=0.4, poll=0.1) is False
+
+
+def test_login_refuses_headless(capsys):
+    """login 은 사람이 보는 창이 필요하다."""
+    assert main(["login", "--headless"]) == 2
+    assert "창이 필요합니다" in capsys.readouterr().out

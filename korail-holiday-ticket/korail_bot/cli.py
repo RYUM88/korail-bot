@@ -21,6 +21,7 @@ from .clicker import (
     DEFAULT_INCLUDE_KEYWORDS,
     DEFAULT_MIN_SCORE,
     TicketPage,
+    wait_until_closed,
 )
 from .scheduler import (
     KST,
@@ -150,6 +151,48 @@ def cmd_clock(args) -> int:
     return 0
 
 
+# ---------------------------------------------------------------- login
+
+
+def cmd_login(args) -> int:
+    """브라우저를 열어 두고 사용자가 로그인하도록 한 뒤 프로필에 저장한다.
+
+    예매 당일에는 대기 중에 손댈 일이 없어야 하므로, 로그인은 미리 끝내 둔다.
+    프로필 폴더에 세션이 남아 ``run`` 이 그대로 이어받는다.
+    """
+    from playwright.sync_api import sync_playwright
+
+    if args.headless:
+        log("오류: login 은 창이 필요합니다. --headless 를 빼고 실행하세요.")
+        return 2
+
+    with sync_playwright() as playwright:
+        context, page = launch_browser(playwright, args)
+        try:
+            log(f"페이지를 엽니다: {args.url}")
+            try:
+                page.goto(args.url, timeout=args.nav_timeout * 1000,
+                          wait_until="domcontentloaded")
+            except Exception as exc:  # noqa: BLE001 - 사용자가 직접 이동해도 된다
+                log(f"  ! 로딩 실패: {type(exc).__name__}: {exc}")
+            log("")
+            log("브라우저에서 코레일에 로그인하세요.")
+            log(f"  로그인 상태는 프로필 폴더({os.path.abspath(args.profile)})에 저장됩니다.")
+            log("  다 하셨으면 브라우저 창을 닫으세요.")
+            finished = wait_until_closed(context, timeout=args.keep_open_timeout)
+            log("")
+            if finished:
+                log("저장했습니다. 이제 run 명령이 이 로그인 상태를 그대로 씁니다.")
+            else:
+                log(f"제한 시간({args.keep_open_timeout:.0f}초)이 지나 종료합니다.")
+        finally:
+            try:
+                context.close()
+            except Exception:  # noqa: BLE001 - 이미 사용자가 닫았다
+                pass
+    return 0
+
+
 # ---------------------------------------------------------------- probe
 
 
@@ -221,7 +264,8 @@ def cmd_probe(args) -> int:
 
             if args.keep_open and not args.headless:
                 log("")
-                input("브라우저를 닫으려면 Enter 를 누르세요... ")
+                log("확인이 끝나면 브라우저 창을 닫으세요. (Ctrl+C 로도 종료)")
+                wait_until_closed(context, timeout=args.keep_open_timeout)
         finally:
             context.close()
     return 0
@@ -232,6 +276,12 @@ def cmd_probe(args) -> int:
 
 def cmd_run(args) -> int:
     from playwright.sync_api import sync_playwright
+
+    if not args.at:
+        log("오류: 목표 시각이 없습니다.")
+        log("  --at 으로 넘기거나, 설정 파일에 \"at\" 을 넣으세요.")
+        log("  예: python -m korail_bot run --at \"2026-09-15 14:00:00\"")
+        return 2
 
     try:
         lead = parse_duration(args.lead)
@@ -317,7 +367,12 @@ def cmd_run(args) -> int:
 
             if args.login_pause and not args.headless:
                 log("")
-                input("  로그인 등 사전 준비를 마친 뒤 Enter 를 누르세요... ")
+                log("  ! --login-pause 는 터미널에서 Enter 입력을 기다립니다.")
+                log("    로그인은 미리 'login' 명령으로 해 두는 편이 낫습니다.")
+                try:
+                    input("  준비를 마친 뒤 Enter 를 누르세요... ")
+                except (EOFError, OSError):
+                    log("    (표준입력이 없어 그냥 진행합니다)")
 
             log("")
             log("[4/5] 대기 (Ctrl+C 로 중단)")
@@ -420,7 +475,8 @@ def cmd_run(args) -> int:
             log("  이후 로그인·좌석 선택·결제는 열려 있는 브라우저에서 직접 진행하세요.")
 
             if args.keep_open and not args.headless:
-                input("\n브라우저를 닫으려면 Enter 를 누르세요... ")
+                log("  브라우저 창을 닫으면 종료됩니다. (Ctrl+C 로도 종료)")
+                wait_until_closed(context, timeout=args.keep_open_timeout)
             elif args.keep_open:
                 time.sleep(args.after_wait)
         except KeyboardInterrupt:
@@ -483,6 +539,12 @@ def add_common(parser: argparse.ArgumentParser) -> None:
         "--http-timeout", type=float, default=6.0, help="시각 동기화 요청 제한 시간(초)"
     )
     parser.add_argument(
+        "--keep-open-timeout",
+        type=float,
+        default=3600.0,
+        help="브라우저가 닫히기를 기다리는 최대 시간(초)",
+    )
+    parser.add_argument(
         "--min-score",
         type=float,
         default=DEFAULT_MIN_SCORE,
@@ -499,6 +561,7 @@ def build_parser() -> argparse.ArgumentParser:
         epilog=(
             "예시:\n"
             "  python -m korail_bot clock\n"
+            "  python -m korail_bot login\n"
             "  python -m korail_bot probe --out candidates.json\n"
             "  python -m korail_bot run --at '2026-09-15 14:00:00' --dry-run\n"
             "  python -m korail_bot run --at '2026-09-15 14:00:00' "
@@ -516,6 +579,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     clock_parser.set_defaults(func=cmd_clock)
 
+    login_parser = sub.add_parser("login", help="미리 로그인해서 프로필에 저장")
+    add_common(login_parser)
+    login_parser.set_defaults(func=cmd_login)
+
     probe_parser = sub.add_parser("probe", help="예매 버튼 후보 탐색")
     add_common(probe_parser)
     probe_parser.add_argument("--limit", type=int, default=15, help="출력할 후보 수")
@@ -532,9 +599,10 @@ def build_parser() -> argparse.ArgumentParser:
     add_common(run_parser)
     run_parser.add_argument(
         "--at",
-        required=True,
+        default=None,
         help="목표 시각(코레일 서버 기준). "
-        "'2026-09-15 14:00:00' / '14:00' / '+90s' 형식",
+        "'2026-09-15 14:00:00' / '14:00' / '+90s' 형식. "
+        "설정 파일의 at 값으로도 지정할 수 있습니다.",
     )
     run_parser.add_argument(
         "--lead", default="0ms", help="목표보다 이만큼 먼저 클릭 (예: 150ms)"
@@ -607,6 +675,7 @@ def build_parser() -> argparse.ArgumentParser:
     # 하위 명령별 기본값을 알아야 한다. 최상위 파서에는 그 정보가 없다.
     parser.korail_subparsers = {
         "clock": clock_parser,
+        "login": login_parser,
         "probe": probe_parser,
         "run": run_parser,
     }

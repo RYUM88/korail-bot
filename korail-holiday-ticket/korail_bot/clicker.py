@@ -22,7 +22,35 @@ __all__ = [
     "DEFAULT_INCLUDE_KEYWORDS",
     "DEFAULT_MIN_SCORE",
     "TicketPage",
+    "wait_until_closed",
 ]
+
+
+def wait_until_closed(context, *, timeout: float = 3600.0, poll: float = 0.5) -> bool:
+    """사용자가 브라우저를 닫을 때까지 기다린다.
+
+    ``input()`` 대신 이걸 쓴다. 표준입력이 없는 환경(예: 에이전트가 대신 실행)에서도
+    막히지 않고, 사용자는 하던 대로 창을 닫으면 된다.
+
+    Returns:
+        브라우저가 닫혀서 끝났으면 ``True``, 제한 시간을 다 썼으면 ``False``.
+    """
+    deadline = time.monotonic() + timeout
+    closed = {"value": False}
+    try:
+        context.on("close", lambda *_: closed.__setitem__("value", True))
+    except Exception:  # noqa: BLE001 - 이벤트를 못 걸어도 아래 폴링으로 감지한다
+        pass
+    while time.monotonic() < deadline:
+        if closed["value"]:
+            return True
+        try:
+            if not context.pages:
+                return True
+        except Exception:  # noqa: BLE001 - 컨텍스트가 이미 사라졌다
+            return True
+        time.sleep(poll)
+    return False
 
 DEFAULT_INCLUDE_KEYWORDS: Sequence[str] = (
     "승차권 예매",

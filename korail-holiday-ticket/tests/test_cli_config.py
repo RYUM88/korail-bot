@@ -94,9 +94,19 @@ def test_config_applies_to_probe_command(config_file):
     assert args.url == "https://example.invalid/"
 
 
-def test_run_requires_target_time():
-    with pytest.raises(SystemExit):
-        parse(["run"])
+def test_target_time_can_come_from_config(config_file):
+    """예매 시각을 설정 파일에 굳혀 두고 인자 없이 실행할 수 있어야 한다."""
+    path = config_file({"at": "2026-09-15 14:00:00"})
+    args = parse(["--config", path, "run"])
+    assert args.at == "2026-09-15 14:00:00"
+
+
+def test_run_without_target_time_fails_clearly(capsys):
+    """--at 도 설정 파일도 없으면 조용히 죽지 말고 이유를 말해야 한다."""
+    from korail_bot.cli import main
+
+    assert main(["run"]) == 2
+    assert "목표 시각이 없습니다" in capsys.readouterr().out
 
 
 def test_split_keywords_falls_back_to_defaults():
