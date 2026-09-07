@@ -51,6 +51,36 @@ FRAME_HTML = """<!DOCTYPE html>
 </body></html>
 """
 
+HOLIDAY_MAIN_HTML = """<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8"><title>추석 명절 승차권</title></head>
+<body>
+  <h1>풍요로운 한가위, 소중한 사람들과 함께</h1>
+  <p><b>장애인, 경로, 임산부, 국가유공자(교통지원대상) 사전 예매(9시~15시)</b></p>
+  <p>09월 03일(목) : 경부·경전·동해·중부내륙·경북·대구·충북·교외선</p>
+  <p>09월 04일(금) : 호남·전라·중앙·강릉·장항·영동·태백·서해·경춘·목포보성선</p>
+  <p><b>일반 회원 추석 승차권 예매(7시~13시)</b></p>
+  <p>09월 07일(월) : <span class="tag">일반열차(ITX새마을·마음, 무궁화호)</span> 전체노선</p>
+  <p>09월 08일(화) : <span class="tag">KTX서울청량리등출도착</span> 경전·강릉·동해·중앙·중부내륙선</p>
+  <p>09월 11일(금) : <span class="tag">KTX서울출도착</span> 경부선</p>
+  <a class="youtube" href="https://www.youtube.com/watch?v=xxx">추석 승차권 예매 꿀팁(코레일과 SR이 하나로!)</a>
+  <div class="cards">
+    <a class="card" href="/reserve/holiday">
+      <strong>추석 명절 승차권</strong>
+      <span>예약만 가능</span>
+    </a>
+    <a class="card" href="/letskorail">
+      <strong>평상시 승차권</strong>
+      <span>코레일 홈페이지로 이동</span>
+    </a>
+  </div>
+  <p>※ 비회원 고객님은 회원가입 후 이용이 가능합니다.(SR단독회원 회원가입 필요)</p>
+</body></html>
+"""
+"""실제 bt.korail.com 캡처의 텍스트 구성을 그대로 옮긴 것.
+
+'추석 명절 승차권' 카드가 목표이고, 바로 위의 '추석 승차권 예매 꿀팁' 유튜브 링크와
+옆의 '평상시 승차권' 카드가 함정이다."""
+
 BOOKING_HTML = """<!DOCTYPE html>
 <html lang="ko"><head><meta charset="utf-8"><title>예매 진행</title></head>
 <body><h1>예매 화면입니다</h1></body></html>
@@ -76,10 +106,13 @@ class FakeKorail:
         open_after: 서버 시작 시점 기준, 예매 버튼이 열리기까지의 시간(초).
             ``None`` 이면 처음부터 열려 있다.
         latency: 응답 전 인위적으로 넣을 지연 범위(초).
+        layout: ``"simple"`` 은 iframe 과 비활성 버튼이 있는 단순 페이지,
+            ``"real"`` 은 실제 bt.korail.com 캡처를 옮긴 페이지.
     """
 
     skew: float = 0.0
     open_after: Optional[float] = None
+    layout: str = "simple"
     latency: Tuple[float, float] = (0.003, 0.030)
     _server: Optional[ThreadingHTTPServer] = field(default=None, init=False)
     _thread: Optional[threading.Thread] = field(default=None, init=False)
@@ -120,7 +153,11 @@ class FakeKorail:
 
             def _body_for(self, path: str) -> Tuple[int, bytes]:
                 if path in ("/", "/holiday/main"):
+                    if outer.layout == "real":
+                        return 200, HOLIDAY_MAIN_HTML.encode("utf-8")
                     return 200, MAIN_HTML.encode("utf-8")
+                if path in ("/reserve/holiday", "/letskorail"):
+                    return 200, BOOKING_HTML.encode("utf-8")
                 if path == "/frame":
                     if outer.open_epoch is None:
                         remaining = 0.0

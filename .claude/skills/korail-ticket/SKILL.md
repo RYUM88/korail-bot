@@ -49,6 +49,16 @@ cd korail-holiday-ticket && ls .venv/.korail-ready 2>/dev/null || echo "준비 �
 
 ### 3. 셀렉터 확보 (예매일 전에 한 번)
 
+**목표는 페이지 하단의 `추석 명절 승차권` / `예약만 가능` 카드다** (2026 추석 기준).
+이 카드에는 '예매'가 아니라 '예약'이라고 쓰여 있고, 바로 위의
+'추석 승차권 예매 꿀팁' 유튜브 링크가 오히려 '승차권 예매'를 품고 있다.
+헷갈리면 유튜브로 간다. 확실하게 하려면 라벨을 그대로 지정한다.
+
+```bash
+--selector "text=추석 명절 승차권"
+```
+
+
 ```bash
 ./yemae.sh probe --out candidates.json
 ```
