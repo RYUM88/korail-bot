@@ -1,4 +1,4 @@
-# claude
+# korail-bot
 
 ## korail-holiday-ticket
 
